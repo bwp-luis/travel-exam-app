@@ -129,3 +129,15 @@ details summary{cursor:pointer;color:var(--link);padding:6px 0}
 .vmore summary{font-size:.9em}
 .vyt{display:flex;gap:10px;align-items:flex-start;margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card2);color:var(--fg);text-decoration:none;font-size:.88em;line-height:1.45}
 .vyt .vplay{flex:none;width:30px;height:30px;border-radius:50%;background:#d93a3a;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:.85em}
+/* 勉強した時間・日ごとの履歴 */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.stats>div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px;display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.stats b{font-size:1.02em;color:#fff;white-space:nowrap}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.cal .d.act{border:1px dashed var(--accent);cursor:pointer}
+.loglist{padding:4px 12px}
+.loglist .li{display:flex;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line)}
+.loglist .li:last-child{border-bottom:0}
+.loglist .tm{flex:0 0 40px;color:var(--sub);font-size:.82em;font-variant-numeric:tabular-nums}
+.loglist .li>span:last-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.stats .sub{white-space:nowrap}

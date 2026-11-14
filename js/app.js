@@ -15,12 +15,18 @@ const defaultState = () => ({
   genreLevel: { domestic: 3, overseas: 3, law: 3 }, // ジャンル別の今のレベル(成績で上下)
   custom: [],            // 取り込んだ問題
   settings: { count: 10, genre: "mix", level: 3, examDate: "" },
+  activity: defaultActivity(), // 勉強した時間と、解いた問題・見た情報の履歴
 });
+// days: {"2026-11-15": {quiz: 秒, read: 秒}} / log: [{t: 時刻, k: 種類, q: 問題ID, n: 名前, o: 正解なら1}]
+// 名前・メールなどの個人情報は入れない(問題IDと地名・図表の名前だけ)。この端末の中だけに置き、外へは送らない
+function defaultActivity() { return { on: true, days: {}, log: [] }; }
 let S = load();
 function load() {
-  try { return Object.assign(defaultState(), JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); }
+  try { return fixState(Object.assign(defaultState(), JSON.parse(localStorage.getItem(STORE_KEY) || "{}"))); }
   catch (e) { return defaultState(); }
 }
+// 前の版の記録・書き出したファイルには activity が無いので補う
+function fixState(s) { s.activity = Object.assign(defaultActivity(), s.activity); return s; }
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
 
 let BUILTIN = [];      // data/ の問題
@@ -62,10 +68,10 @@ const ORIGINS = { all: "すべて", past: "過去問", sample: "オリジナル"
 const originOk = (q, o) => !o || o === "all" || (o === "past" ? isPast(q) : !isPast(q));
 // 写真・図が要る問題は問題用紙の該当部分の画像を、資料編が要る問題は資料編PDFへの案内を出す
 const figHtml = q => (q.image ? `<figure class="qfig"><img src="${h(q.image)}" alt="問題の図・写真(問題用紙より)" loading="lazy"><figcaption>問題用紙の該当部分(図・写真を含む)</figcaption></figure>` : "")
-  + (/^https:\/\//.test(q.docUrl || "") ? `<div class="multi-note">📎 この問題は<b>資料編</b>(運賃表・時刻表など)を見て解きます: <a href="${h(q.docUrl)}" target="_blank" rel="noopener">資料編PDFを開く</a></div>` : "");
+  + (/^https:\/\//.test(q.docUrl || "") ? `<div class="multi-note">📎 この問題は<b>資料編</b>(運賃表・時刻表など)を見て解きます: <a href="${h(q.docUrl)}" target="_blank" rel="noopener" data-log="pdf" data-q="${h(q.id)}" data-n="資料編PDF">資料編PDFを開く</a></div>` : "");
 function srcHtml(q) {
   const links = [["問題PDF", q.sourceUrl], ["正解PDF", q.answerUrl], ["掲載ページ", q.pageUrl]].filter(x => /^https:\/\//.test(x[1] || ""));
-  return `<div class="src">出典: ${h(q.source)}${links.length ? "<br>" + links.map(([t, u]) => `<a href="${h(u)}" target="_blank" rel="noopener">${t}</a>`).join(" ・ ") : ""}${isPast(q) ? `<br>レベルは推定(形式・計算の有無・文章量から自動で決めた目安)` : ""}</div>`;
+  return `<div class="src">出典: ${h(q.source)}${links.length ? "<br>" + links.map(([t, u]) => `<a href="${h(u)}" target="_blank" rel="noopener" data-log="pdf" data-q="${h(q.id)}" data-n="${t}">${t}</a>`).join(" ・ ") : ""}${isPast(q) ? `<br>レベルは推定(形式・計算の有無・文章量から自動で決めた目安)` : ""}</div>`;
 }
 
 // ---------- 見て覚える(解説の下に地図・写真・図表・動画の案内。data/visual/。tools/build_visuals.py で作る) ----------
@@ -112,18 +118,17 @@ function mapSvg(p, wide) {
     <rect x="${x0}" y="${y0}" width="${W}" height="${H}" class="sea"/>${path(VIS.world, "land")}${jp ? path(VIS.jp, "pref") : ""}
     <ellipse cx="${cx}" cy="${cy}" rx="${W * .04}" ry="${H * .064}" class="dot" vector-effect="non-scaling-stroke"/></svg>`; // 点は地図の幅の約4%
 }
-const ytLink = s => `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s)}" target="_blank" rel="noopener">▶ YouTubeで探す</a>`;
+const ytLink = s => `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s)}" target="_blank" rel="noopener" data-log="yts" data-n="${h(s)}">▶ YouTubeで探す</a>`;
 function placeCard(p, i) {
   // 地図と写真は横に並べる(スマホで1件が長くならないように)
   return `<div class="vcard"><div class="vtitle">📍 <b>${h(p.n)}</b> <span class="sub">${h(p.rn || "")}・${h(p.k)}</span></div>
     <div class="vpair">${p.lat != null ? `<button class="vmap" data-i="${VIS.places.indexOf(p)}" aria-label="地図の広さを切り替える">${mapSvg(p, false)}<span class="vzoom">広く</span></button>` : ""}
-    ${p.img ? `<a class="vphoto" href="${h(p.img.u)}" target="_blank" rel="noopener"><img src="${h(p.img.u)}" alt="${h(p.n)}の写真" loading="lazy"></a>` : ""}</div>
+    ${p.img ? `<a class="vphoto" href="${h(p.img.u)}" target="_blank" rel="noopener" data-log="photo" data-n="${h(p.n)}"><img src="${h(p.img.u)}" alt="${h(p.n)}の写真" loading="lazy"></a>` : ""}</div>
     ${p.img ? `<div class="vcap">写真: ${h(p.img.by || "作者不明")} / ${h(p.img.lic)}(<a href="${h(p.img.page)}" target="_blank" rel="noopener">Wikimedia Commons</a>)</div>` : ""}
-    <div class="vlinks"><a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(p.w)}" target="_blank" rel="noopener">Wikipediaで読む</a>${p.yt ? "" : ytLink(`${p.n} ${p.k === "空港" ? "空港" : p.k === "祭" ? "" : "観光"}`.trim())}</div>
-    ${p.yt ? `<a class="vyt" href="https://www.youtube.com/watch?v=${h(p.yt.id)}" target="_blank" rel="noopener"><span class="vplay">▶</span><span><b>${p.yt.own ? "参考動画(個人の旅行チャンネル)" : "おすすめ動画"}</b> ${h(p.yt.t)}<br><span class="sub">${h(p.yt.ch)}</span></span></a>` : ""}</div>`;
+    <div class="vlinks"><a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(p.w)}" target="_blank" rel="noopener" data-log="wiki" data-n="${h(p.n)}">Wikipediaで読む</a>${p.yt ? "" : ytLink(`${p.n} ${p.k === "空港" ? "空港" : p.k === "祭" ? "" : "観光"}`.trim())}</div>
+    ${p.yt ? `<a class="vyt" href="https://www.youtube.com/watch?v=${h(p.yt.id)}" target="_blank" rel="noopener" data-log="video" data-n="${h(p.n + "|" + p.yt.t)}"><span class="vplay">▶</span><span><b>${p.yt.own ? "参考動画(個人の旅行チャンネル)" : "おすすめ動画"}</b> ${h(p.yt.t)}<br><span class="sub">${h(p.yt.ch)}</span></span></a>` : ""}</div>`;
 }
-function visBody(q) {
-  const { places, figs } = visMatch(q);
+function visBody({ places, figs }) {
   if (!places.length && !figs.length) return "";
   const MAX = 4;
   return `<div class="vhead">👀 見て覚える</div>
@@ -140,14 +145,55 @@ async function fillVis(root = document) {
   if (!els.length) return;
   if (!VIS) await loadVis();
   if (!VIS) return;
-  for (const el of els) { const q = qById(el.dataset.q); el.dataset.done = "1"; if (q) el.innerHTML = visBody(q); if (!el.innerHTML) el.hidden = true; }
+  for (const el of els) { const q = qById(el.dataset.q); el.dataset.done = "1"; const m = q && visMatch(q); if (m) el.innerHTML = visBody(m); if (!el.innerHTML) el.hidden = true;
+    else { const { places, figs } = m; logEv("vis", q.id, figs.map(f => f.t).concat(places.slice(0, 4).map(p => p.n)).join("・")); } }
 }
-document.addEventListener("toggle", e => { if (e.target.open) fillVis(e.target); }, true);
+document.addEventListener("toggle", e => {
+  if (!e.target.open) return;
+  const v = e.target.querySelector(".vis"); if (v) logEv("expl", v.dataset.q); // 解説を開いた
+  fillVis(e.target);
+}, true);
 document.addEventListener("click", e => {
   const b = e.target.closest(".vmap"); if (!b || !VIS) return;
   const wide = b.classList.toggle("wide"), p = VIS.places[+b.dataset.i];
+  if (wide) logEv("map", b.closest(".vis")?.dataset.q || "", p.n);
   b.innerHTML = mapSvg(p, wide) + `<span class="vzoom">${wide ? "近く" : "広く"}</span>`;
 });
+
+// ---------- 勉強した時間と、解いた問題・見た情報の履歴(S.activity。この端末の localStorage だけに保存) ----------
+// 時間: 画面を開いていて、2分以内に触っている間だけ15秒ずつ足す(解いている間=quiz、それ以外=read)
+const TICK = 15, IDLE = 120e3, LOG_MAX = 8000, LOG_DAYS = 400;
+let lastInput = Date.now(), unsavedTicks = 0;
+["pointerdown", "keydown", "scroll", "touchstart", "wheel"].forEach(ev => addEventListener(ev, () => { lastInput = Date.now(); }, { passive: true, capture: true }));
+const studying = () => !!session && location.hash.startsWith("#/quiz");
+setInterval(() => {
+  if (!S.activity.on || document.visibilityState !== "visible" || Date.now() - lastInput > IDLE) return;
+  const d = (S.activity.days[dayKey(new Date())] ||= { quiz: 0, read: 0 });
+  d[studying() ? "quiz" : "read"] += TICK;
+  if (++unsavedTicks >= 4) flushAct(); // 保存は1分ごと(と画面を離れたとき)
+}, TICK * 1000);
+function flushAct() { if (!unsavedTicks) return; unsavedTicks = 0; try { save(); } catch (e) {} }
+addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushAct(); });
+addEventListener("pagehide", flushAct);
+// 履歴に1件足す。同じものを10分以内に続けて見たときは足さない。古いもの(400日より前・8000件より多い分)は消す
+function logEv(k, q = "", n = "", extra) {
+  if (!S.activity.on) return;
+  const L = S.activity.log, t = Date.now();
+  if (!extra && L.slice(-30).some(e => e.k === k && e.q === q && e.n === n && t - e.t < 6e5)) return;
+  L.push(Object.assign({ t, k, q, n }, extra));
+  if (L.length > LOG_MAX || L[0].t < t - LOG_DAYS * 864e5) S.activity.log = L.filter(e => e.t >= t - LOG_DAYS * 864e5).slice(-LOG_MAX);
+  try { save(); } catch (e) { S.activity.log.splice(0, 500); } // 容量が足りないときは古い分から減らす
+}
+// 外のページ(Wikipedia・動画・写真・PDF)を開いたとき。記録するのは名前だけで、開く先のURLには何も付けない
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-log]"); if (!a) return;
+  logEv(a.dataset.log, a.dataset.q || a.closest("[data-q]")?.dataset.q || "", a.dataset.n || "");
+}, true);
+const LOGKIND = { expl: "📖 解説を開いた", vis: "👀 見て覚える(地図・写真・図表)", map: "🗺 地図を広げた", wiki: "🌐 地名のページ(Wikipedia)",
+  photo: "📷 写真を開いた", video: "▶ 動画を開いた", yts: "🔎 YouTubeで探した", pdf: "📎 PDFを開いた" };
+const mins = sec => Math.round(sec / 60);
+const fmtMin = sec => { const m = mins(sec); return m >= 60 ? `${Math.floor(m / 60)}時間${m % 60 ? m % 60 + "分" : ""}` : `${m}分`; };
+const dayTime = k => { const d = S.activity.days[k]; return d ? d.quiz + d.read : 0; };
 
 // ---------- 問題の読み込み ----------
 async function loadBuiltin() {
@@ -320,9 +366,9 @@ routes.home = () => {
       <a class="tile" href="#/setup?mode=practice"><span class="ic">✏️</span>練習<span class="sub">1問ずつ答え合わせ</span></a>
       <a class="tile" href="#/setup?mode=weak"><span class="ic">🎯</span>弱点復習<span class="sub">苦手と間違いを中心に</span></a>
       <a class="tile" href="#/study"><span class="ic">📖</span>勉強(解説を読む)<span class="sub">問題と解説の一覧</span></a>
-      <a class="tile" href="#/history"><span class="ic">📅</span>受験履歴<span class="sub">一覧とカレンダー</span></a>
+      <a class="tile" href="#/history"><span class="ic">📅</span>履歴<span class="sub">カレンダー・解いた問題・見た情報</span></a>
       <a class="tile" href="#/analysis"><span class="ic">🔍</span>間違い・弱点<span class="sub">ジャンル別の正答率</span></a>
-      <a class="tile" href="#/charts"><span class="ic">📈</span>成長グラフ<span class="sub">レベルと正答率の推移</span></a>
+      <a class="tile" href="#/charts"><span class="ic">📈</span>成長グラフ<span class="sub">勉強した時間・レベル・正答率</span></a>
       <a class="tile" href="#/data"><span class="ic">➕</span>問題の追加・設定<span class="sub">JSON/CSV取り込み・バックアップ</span></a>
       <a class="tile" href="#/about"><span class="ic">ℹ️</span>出典・試験の構成<span class="sub">使い方</span></a>
     </div>
@@ -428,11 +474,11 @@ routes.quiz = () => {
       it.chosen = nx.length ? nx : null;
     } else {
       it.chosen = [ci];
-      if (instant) it.checked = true;
+      if (instant) { it.checked = true; logAns(s, it); }
     }
     routes.quiz();
   };
-  const ck = $("#check"); if (ck) ck.onclick = () => { it.checked = true; routes.quiz(); };
+  const ck = $("#check"); if (ck) ck.onclick = () => { it.checked = true; logAns(s, it); routes.quiz(); };
   $("#prev").onclick = () => { s.idx--; routes.quiz(); };
   const nx = $("#next"); if (nx) nx.onclick = () => { s.idx++; routes.quiz(); };
   const fin = $("#finish"); if (fin) fin.onclick = () => {
@@ -442,6 +488,8 @@ routes.quiz = () => {
   };
 };
 const QM = it => qById(it.id).multi;
+// 解いた問題の履歴(練習・弱点復習は答え合わせのとき、模擬試験は採点のとき)
+const logAns = (s, it) => logEv("ans", it.id, MODES[s.mode], { o: sameSet(toArr(it.chosen), qById(it.id).ans) ? 1 : 0 });
 function quizMainButton(s, it) {
   const lastQ = s.idx === s.items.length - 1;
   if (s.mode === "exam") return lastQ ? `<button class="btn-primary" id="finish">採点する</button>` : `<button class="btn-primary" id="next">次へ ›</button>`;
@@ -456,6 +504,7 @@ function finish() {
   const answers = s.items.map(it => {
     const q = qById(it.id), ok = sameSet(toArr(it.chosen), q.ans);
     if (ok) correct++;
+    if (s.mode === "exam") logAns(s, it);
     (perGenre[q.genre] ||= { c: 0, t: 0 }); perGenre[q.genre].t++; if (ok) perGenre[q.genre].c++;
     const st = S.qstats[q.id] || { seen: 0, wrong: 0 };
     st.seen++; if (!ok) st.wrong++; st.last = ok; st.lastChosen = it.chosen; st.lastDate = new Date().toISOString();
@@ -552,38 +601,72 @@ routes.study = (_, p) => {
   draw();
 };
 
-// ---------- 受験履歴(一覧+カレンダー) ----------
+// ---------- 履歴(受験の一覧+カレンダー。日付を押すと、その日の勉強時間・解いた問題・見た情報) ----------
 let calMonth = null, calSel = null;
 routes.history = () => {
   const now = new Date();
   if (!calMonth) calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const byDay = {};
+  const byDay = {}, logDay = {};
   for (const a of S.attempts) (byDay[dayKey(new Date(a.date))] ||= []).push(a);
+  for (const e of S.activity.log) (logDay[dayKey(new Date(e.t))] ||= []).push(e);
   const y = calMonth.getFullYear(), m = calMonth.getMonth();
   const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
   let cells = "日月火水木金土".split("").map(d => `<div class="dow">${d}</div>`).join("");
   for (let i = 0; i < first; i++) cells += `<div class="d empty"></div>`;
   for (let d = 1; d <= days; d++) {
-    const k = dayKey(new Date(y, m, d)), list = byDay[k];
+    const k = dayKey(new Date(y, m, d)), list = byDay[k], sec = dayTime(k), act = list || sec >= 60 || logDay[k];
     const best = list ? Math.max(...list.map(a => pct(a.correct, a.total))) : null;
-    cells += `<div class="d ${list ? "has" : ""} ${k === dayKey(now) ? "today" : ""} ${k === calSel ? "sel" : ""}" data-k="${list ? k : ""}">${d}${list ? `<span class="s">${list.length}回<br>${best}点</span>` : ""}</div>`;
+    cells += `<div class="d ${list ? "has" : act ? "act" : ""} ${k === dayKey(now) ? "today" : ""} ${k === calSel ? "sel" : ""}" data-k="${act ? k : ""}">${d}${act ? `<span class="s">${sec >= 60 ? mins(sec) + "分" : "記録"}${list ? `<br>${best}点` : ""}</span>` : ""}</div>`;
   }
   const shown = calSel ? (byDay[calSel] || []) : S.attempts.slice().reverse();
-  page("受験履歴", `
+  page("履歴(受験・勉強)", `
     <div class="card">
       <div class="row" style="align-items:center"><button id="pm" style="flex:0 0 52px">‹</button><b style="text-align:center">${y}年${m + 1}月</b><button id="nm" style="flex:0 0 52px">›</button></div>
       <div class="cal" id="cal" style="margin-top:8px">${cells}</div>
-      <div class="sub" style="margin-top:6px">枠のある日=受験した日(回数と最高点)。日付をタップでその日の記録だけ表示。</div>
+      <div class="sub" style="margin-top:6px">実線の枠=受験した日(勉強した時間と最高点)、点線の枠=勉強だけした日。日付をタップすると、その日に解いた問題・見た情報が出ます。</div>
     </div>
-    <h2>${calSel ? `${calSel} の記録 <button id="clr" style="min-height:32px;padding:2px 10px;font-size:.8em">すべて表示</button>` : `すべての記録(${S.attempts.length}回)`}</h2>
+    ${calSel ? `<h2>${calSel} の記録 <button id="clr" style="min-height:32px;padding:2px 10px;font-size:.8em">すべて表示</button></h2>
+      ${dayDetail(calSel, byDay[calSel] || [], logDay[calSel] || [])}<h3>受験(${shown.length}回)</h3>` : `<h2>すべての受験記録(${S.attempts.length}回)</h2>`}
     ${shown.length ? `<div class="card" style="padding:4px 10px"><table><tr><th>日時</th><th>内容</th><th>点</th></tr>
       ${shown.map(a => `<tr data-id="${a.id}" style="cursor:pointer"><td>${fmtDate(a.date)}</td><td>${MODES[a.mode]}<br><span class="sub">${genreLabel(a.genre)}${a.level ? ` Lv${a.level}` : ""} ${a.total}問</span></td>
-        <td><b class="${pct(a.correct, a.total) >= 60 ? "ok" : "bad"}">${pct(a.correct, a.total)}</b></td></tr>`).join("")}</table></div>` : `<div class="card sub">記録がありません。</div>`}`);
+        <td><b class="${pct(a.correct, a.total) >= 60 ? "ok" : "bad"}">${pct(a.correct, a.total)}</b></td></tr>`).join("")}</table></div>` : `<div class="card sub">${calSel ? "この日の受験はありません。" : "記録がありません。"}</div>`}`);
   $("#pm").onclick = () => { calMonth = new Date(y, m - 1, 1); routes.history(); };
   $("#nm").onclick = () => { calMonth = new Date(y, m + 1, 1); routes.history(); };
   $("#cal").onclick = e => { const d = e.target.closest(".d"); if (d && d.dataset.k) { calSel = d.dataset.k === calSel ? null : d.dataset.k; routes.history(); } };
   const c = $("#clr"); if (c) c.onclick = () => { calSel = null; routes.history(); };
   document.querySelectorAll("tr[data-id]").forEach(tr => tr.onclick = () => go("/result/" + tr.dataset.id));
+};
+// その日の勉強時間・解いた問題(同じ問題はまとめる)・見た情報(時刻順)
+function dayDetail(k, list, logs) {
+  const d = S.activity.days[k] || { quiz: 0, read: 0 };
+  let ans = logs.filter(e => e.k === "ans");
+  // 履歴を取り始める前の日は、受験の記録から解いた問題を出す
+  if (!ans.length) ans = list.flatMap(a => a.answers.map(x => ({ t: +new Date(a.date), q: x.id, o: x.ok ? 1 : 0 })));
+  const qs = new Map();
+  for (const e of ans) { const r = qs.get(e.q) || { q: e.q, t: e.t, n: 0, ok: 0, last: 0 }; r.n++; r.ok += e.o; r.last = e.o; qs.set(e.q, r); }
+  const seen = logs.filter(e => e.k !== "ans");
+  const hm = t => { const x = new Date(t); return `${pad(x.getHours())}:${pad(x.getMinutes())}`; };
+  const qline = id => { const q = qById(id); return q ? `${chip(q.genre)} <a href="#/q/${encodeURIComponent(id)}">${h(q.question.slice(0, 40))}${q.question.length > 40 ? "…" : ""}</a>`
+    : `<span class="sub">(この端末で今は開けない問題 ${h(id)})</span>`; };
+  const right = [...qs.values()].filter(r => r.last).length;
+  return `<div class="card"><b>勉強した時間 ${fmtMin(d.quiz + d.read)}</b><br><span class="sub">問題を解く ${fmtMin(d.quiz)}・解説を読む/復習など ${fmtMin(d.read)}</span></div>
+    <h3>解いた問題(${qs.size}問・最後に◯ ${right}問)</h3>
+    ${qs.size ? `<div class="card loglist">${[...qs.values()].map(r => `<div class="li"><span class="tm">${hm(r.t)}</span><b class="${r.last ? "ok" : "bad"}">${r.last ? "◯" : "✕"}</b>
+      <span>${qline(r.q)}${r.n > 1 ? ` <span class="sub">${r.n}回中◯${r.ok}</span>` : ""}</span></div>`).join("")}</div>` : `<div class="card sub">この日に解いた問題はありません。</div>`}
+    <h3>見た情報(${seen.length}件)</h3>
+    ${seen.length ? `<div class="card loglist">${seen.map(e => `<div class="li"><span class="tm">${hm(e.t)}</span><span><b>${LOGKIND[e.k] || h(e.k)}</b>${e.n ? ` ${h(e.n.split("|").join(" — "))}` : ""}${e.q ? `<br>${qline(e.q)}` : ""}</span></div>`).join("")}</div>`
+      : `<div class="card sub">この日に見た解説・地名・動画の記録はありません${S.activity.on ? "" : "(記録を止めています)"}。</div>`}`;
+}
+// 1問だけの画面(履歴の一覧から開く)
+routes.q = ([id]) => {
+  const q = qById(decodeURIComponent(id || ""));
+  if (!q) return page("問題と解説", `<div class="card sub">この問題は見つかりません。合言葉で開く過去問は、ホームで合言葉を入れてから見られます。</div>`);
+  const s = stat(q.id);
+  page("問題と解説", `<div class="card"><div class="qhead">${chip(q.genre)}<span class="chip">Lv ${q.level}</span>${q.topic ? `<span class="chip">${h(q.topic)}</span>` : ""}
+      ${s.seen ? `<span class="sub">${s.seen}回中 ${s.wrong}回ミス</span>` : `<span class="sub">未出題</span>`}</div>
+    <div class="pre">${h(q.question)}</div>${figHtml(q)}
+    <details><summary>選択肢・正解・解説を見る</summary>${choiceList(q)}
+    <div class="expl">${h(q.explanation)}</div>${visHtml(q)}${srcHtml(q)}</details></div>`);
 };
 
 // ---------- 間違い・弱点 ----------
@@ -628,17 +711,88 @@ routes.charts = () => {
     }
   });
   const n = S.attempts.length;
-  page("成長グラフ", n < 1 ? `<div class="card sub">受験すると、ここにジャンル別のレベルと正答率の推移が出ます。</div>` : `
+  page("成長グラフ", timeSection() + (n < 1 ? `<h2>レベルと正答率</h2><div class="card sub">受験すると、ここにジャンル別のレベルと正答率の推移が出ます。</div>` : `
     <div class="legend">${GENRE_KEYS.map(g => `<span>${chip(g)}</span>`).join("")}<span class="sub">横軸=受験の回(古い→新しい)</span></div>
     <h2>ジャンル別のレベル(受験後)</h2>
     <div class="card chart" id="c-lv"></div>
     <h2>ジャンル別の正答率(%)</h2>
     <div class="card chart" id="c-acc"></div>
     <details class="card"><summary>表で見る</summary><table><tr><th>回</th><th>日時</th>${GENRE_KEYS.map(g => `<th>${GENRES[g]}</th>`).join("")}</tr>
-      ${S.attempts.map((a, i) => `<tr><td>${i + 1}</td><td>${fmtDate(a.date)}</td>${GENRE_KEYS.map(g => `<td>${a.perGenre[g] ? pct(a.perGenre[g].c, a.perGenre[g].t) + "%" : "−"}<br><span class="sub">Lv${a.levelAfter ? a.levelAfter[g] : "−"}</span></td>`).join("")}</tr>`).join("")}</table></details>`);
+      ${S.attempts.map((a, i) => `<tr><td>${i + 1}</td><td>${fmtDate(a.date)}</td>${GENRE_KEYS.map(g => `<td>${a.perGenre[g] ? pct(a.perGenre[g].c, a.perGenre[g].t) + "%" : "−"}<br><span class="sub">Lv${a.levelAfter ? a.levelAfter[g] : "−"}</span></td>`).join("")}</tr>`).join("")}</table></details>`));
+  drawTime();
   if (n) { lineChart($("#c-lv"), pts.lv, { min: 1, max: 10, ticks: [1, 4, 7, 10], unit: "", n, label: "Lv" });
     lineChart($("#c-acc"), pts.acc, { min: 0, max: 100, ticks: [0, 20, 40, 60, 80, 100], unit: "%", n, line60: true }); }
 };
+// 勉強した時間(日別=この14日 / 週別=この12週。週は月曜から)。積み上げ棒: 下=問題を解く、上=解説を読む・復習など
+// 色は dataviz の検証済みダーク用の4・5番目(ジャンルの3色と重ならない)。色だけに頼らず凡例と表も付ける
+const TIME_COLOR = { quiz: "#c98500", read: "#d55181" }, TIME_NAME = { quiz: "問題を解く", read: "解説を読む・復習など" };
+let timeView = "day";
+function timeBars(view) {
+  const today = new Date(), d0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const sum = (from, n) => { const r = { a: 0, b: 0 }; for (let i = 0; i < n; i++) { const x = S.activity.days[dayKey(new Date(from.getFullYear(), from.getMonth(), from.getDate() + i))]; if (x) { r.a += x.quiz; r.b += x.read; } } return r; };
+  const md = d => `${d.getMonth() + 1}/${d.getDate()}`;
+  if (view === "day") return [...Array(14)].map((_, i) => { const d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() - 13 + i);
+    return Object.assign(sum(d, 1), { lab: md(d), tip: `${md(d)}(${"日月火水木金土"[d.getDay()]})` }); });
+  const mon = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() - (d0.getDay() + 6) % 7);
+  return [...Array(12)].map((_, i) => { const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() - 7 * (11 - i));
+    return Object.assign(sum(d, 7), { lab: md(d), tip: `${md(d)}〜${md(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6))}の週` }); });
+}
+function timeSection() {
+  const today = new Date(), k0 = dayKey(today), back = n => dayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - n));
+  const week = timeBars("week").at(-1), d30 = [...Array(30)].reduce((s, _, i) => s + dayTime(back(i)), 0);
+  let streak = 0; for (let i = dayTime(k0) >= 60 ? 0 : 1; dayTime(back(i)) >= 60; i++) streak++; // 今日まだなら昨日から数える
+  const bars = timeBars(timeView);
+  return `<h2>勉強した時間</h2>
+    <div class="stats">
+      <div><span class="sub">今日</span><b>${fmtMin(dayTime(k0))}</b></div><div><span class="sub">今週</span><b>${fmtMin(week.a + week.b)}</b></div>
+      <div><span class="sub">この30日</span><b>${fmtMin(d30)}</b></div><div><span class="sub">続けた日数</span><b>${streak}日</b></div>
+    </div>
+    <div class="seg" id="tview" style="margin-top:8px">${[["day", "日別(この14日)"], ["week", "週別(この12週)"]].map(([k, v]) => `<button data-v="${k}" aria-pressed="${k === timeView}">${v}</button>`).join("")}</div>
+    <div class="legend" style="margin-top:8px">${Object.keys(TIME_COLOR).map(k => `<span><i class="sw" style="background:${TIME_COLOR[k]}"></i>${TIME_NAME[k]}</span>`).join("")}</div>
+    <div class="card chart" id="c-time"></div>
+    <details class="card"><summary>表で見る</summary><table><tr><th>${timeView === "day" ? "日" : "週"}</th><th>合計</th><th>解く</th><th>読む・復習</th></tr>
+      ${bars.slice().reverse().map(b => `<tr><td>${b.tip}</td><td>${fmtMin(b.a + b.b)}</td><td>${fmtMin(b.a)}</td><td>${fmtMin(b.b)}</td></tr>`).join("")}</table></details>
+    <p class="sub">画面を開いて操作している間だけ数えます(2分以上触らないと止まる)。${S.activity.on ? "" : "<b>今は記録を止めています(「問題の追加・設定」で再開)。</b>"}</p>`;
+}
+function drawTime() {
+  const el = $("#c-time"); if (!el) return;
+  barChart(el, timeBars(timeView));
+  $("#tview").onclick = e => { const b = e.target.closest("button"); if (b && b.dataset.v !== timeView) { timeView = b.dataset.v; const y0 = scrollY; routes.charts(); scrollTo(0, y0); } };
+}
+// 積み上げ棒グラフ(SVG手作り)。棒の上端だけ角を丸め、段の間に2pxのすき間。なぞる/押すと数値
+function barChart(el, bars) {
+  const W = 340, H = 190, L = 44, R = 8, T = 12, B = 26, n = bars.length;
+  const maxM = Math.max(...bars.map(b => (b.a + b.b) / 60));
+  const step = [5, 10, 15, 30, 60, 120, 180, 300, 600, 1200].find(s => maxM / s <= 4) || 1200, top = Math.max(step, Math.ceil(maxM / step) * step);
+  const ys = m => T + (1 - m / top) * (H - T - B), slot = (W - L - R) / n, bw = Math.min(18, slot * .64), xc = i => L + slot * (i + .5);
+  const lab = m => step >= 60 ? `${m / 60}時間` : `${m}分`;
+  const seg = (x, y1, y2, round, c) => { if (y2 - y1 < .5) return ""; const r = Math.min(4, (y2 - y1), bw / 2), w = bw / 2;
+    return round ? `<path d="M${x - w} ${y2}V${y1 + r}Q${x - w} ${y1} ${x - w + r} ${y1}H${x + w - r}Q${x + w} ${y1} ${x + w} ${y1 + r}V${y2}Z" fill="${c}"/>` : `<rect x="${x - w}" y="${y1}" width="${bw}" height="${y2 - y1}" fill="${c}"/>`; };
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="勉強した時間の棒グラフ">`;
+  for (let t = 0; t <= top; t += step) s += `<line x1="${L}" x2="${W - R}" y1="${ys(t)}" y2="${ys(t)}" stroke="#4a5468" stroke-width="1" ${t ? 'stroke-dasharray="2 4"' : ""}/><text x="${L - 6}" y="${ys(t) + 4}" fill="#a9b2c3" font-size="10" text-anchor="end">${lab(t)}</text>`;
+  const every = n > 7 ? 2 : 1;
+  bars.forEach((b, i) => {
+    const qa = b.a / 60, rb = b.b / 60, x = xc(i), base = ys(0), mid = ys(qa), end = ys(qa + rb);
+    s += seg(x, mid, base, mid - end < 3, TIME_COLOR.quiz); // 上に「読む」が見えるほど無ければ「解く」の上端を丸める
+    if (rb > 0) s += seg(x, end, qa > 0 ? mid - 2 : base, true, TIME_COLOR.read);
+    if ((n - 1 - i) % every === 0) s += `<text x="${x}" y="${H - 8}" fill="#a9b2c3" font-size="10" text-anchor="middle">${b.lab}</text>`;
+  });
+  s += `<rect id="bh" y="${T}" height="${H - T - B}" width="${slot}" fill="#ffffff" fill-opacity=".06" visibility="hidden"/></svg><div class="tip"></div>`;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), bh = el.querySelector("#bh");
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W, i = Math.floor((px - L) / slot);
+    if (i < 0 || i >= n) { tip.style.display = "none"; bh.setAttribute("visibility", "hidden"); return; }
+    const b = bars[i];
+    bh.setAttribute("x", L + slot * i); bh.setAttribute("visibility", "visible");
+    tip.innerHTML = `<b>${b.tip}</b> 合計 ${fmtMin(b.a + b.b)}<br>${TIME_NAME.quiz}: ${fmtMin(b.a)}<br>${TIME_NAME.read}: ${fmtMin(b.b)}`;
+    tip.style.display = "block";
+    tip.style.left = Math.min(r.width - tip.offsetWidth, Math.max(0, xc(i) / W * r.width - tip.offsetWidth / 2)) + "px";
+    tip.style.top = "-6px";
+  };
+  svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move);
+  svg.addEventListener("pointerleave", () => { tip.style.display = "none"; bh.setAttribute("visibility", "hidden"); });
+}
 function marker(shape, x, y, color) {
   const ring = `stroke="#353d4e" stroke-width="2"`;
   if (shape === "square") return `<rect x="${x - 4.5}" y="${y - 4.5}" width="9" height="9" rx="1.5" fill="${color}" ${ring}/>`;
@@ -699,6 +853,15 @@ routes.data = () => {
     <div class="card sub">取り込み済み: ${S.custom.length} 問 ${S.custom.length ? `<button id="delc" style="min-height:36px;padding:4px 10px">取り込んだ問題を消す</button>` : ""}</div>
     <h2>試験日</h2>
     <div class="card"><input type="date" id="exam" value="${h(S.settings.examDate)}"><div class="sub">入れるとホームに「あと何日」が出ます。</div></div>
+    <h2>勉強の記録(時間・解いた問題・見た情報)</h2>
+    <div class="card">
+      <p class="sub">勉強した時間と、解いた問題・開いた解説・地名のページ・動画などの履歴を、成長グラフと履歴のカレンダーに出すために記録します。
+        記録はこの端末のブラウザの中(localStorage)だけに置き、サーバーやほかの人には送りません。中身は日付と時刻・時間・問題の番号・地名や図表の名前だけで、名前やメールなどの個人情報は入れません。
+        外のページ(Wikipedia・YouTube など)は、開いたという事実と名前を手元に残すだけで、相手に何かを付けて送ることはありません。古い履歴は400日・${LOG_MAX}件を超えた分から消えます。</p>
+      <div class="sub">今の記録: ${Object.keys(S.activity.days).length} 日分の時間・履歴 ${S.activity.log.length} 件</div>
+      <div class="row" style="margin-top:8px"><button id="actOn">${S.activity.on ? "⏸ 記録を止める" : "▶ 記録を再開する"}</button><button id="actDel">時間と履歴だけ消す</button></div>
+      <div class="sub" style="margin-top:4px">${S.activity.on ? "記録中です。" : "<b>今は記録を止めています。</b>"}下の「記録を書き出す」のファイルにも、この記録が入ります(人に渡すときは注意)。</div>
+    </div>
     <h2>バックアップ</h2>
     <div class="card">
       <p class="sub">記録はこの端末のブラウザの中だけにあります。機種変更・ブラウザのデータ消去の前に書き出してください。</p>
@@ -719,6 +882,8 @@ routes.data = () => {
     $("#imp").innerHTML = `<p class="ok">${ok.length} 問を取り込みました。</p>${ng.length ? `<p class="bad">取り込めなかったもの ${ng.length} 件</p><div class="sub">${ng.slice(0, 20).map(h).join("<br>")}</div>` : ""}`;
   };
   const dc = $("#delc"); if (dc) dc.onclick = () => { if (window.confirm("取り込んだ問題を消しますか?(受験記録は残ります)")) { S.custom = []; resetQ(); save(); routes.data(); } };
+  $("#actOn").onclick = () => { S.activity.on = !S.activity.on; save(); toast(S.activity.on ? "記録を再開しました" : "記録を止めました"); routes.data(); };
+  $("#actDel").onclick = () => { if (window.confirm("勉強した時間と、解いた問題・見た情報の履歴を消します(受験記録・成績は残ります)。元に戻せません。よいですか?")) { S.activity = Object.assign(defaultActivity(), { on: S.activity.on }); save(); toast("消しました"); routes.data(); } };
   $("#exam").onchange = e => { S.settings.examDate = e.target.value; save(); toast("保存しました"); };
   $("#exp").onclick = () => {
     const b = new Blob([JSON.stringify(S, null, 1)], { type: "application/json" });
@@ -728,10 +893,10 @@ routes.data = () => {
     const f = e.target.files[0]; if (!f) return;
     try { const d = JSON.parse(await f.text()); if (!Array.isArray(d.attempts)) throw new Error("記録のファイルではありません");
       if (!window.confirm("今の記録をこのファイルの中身で置き換えます。よいですか?")) return;
-      S = Object.assign(defaultState(), d); resetQ(); save(); toast("読み戻しました"); routes.data(); }
+      S = fixState(Object.assign(defaultState(), d)); resetQ(); save(); toast("読み戻しました"); routes.data(); }
     catch (err) { toast("読めませんでした: " + err.message); }
   };
-  $("#reset").onclick = () => { if (window.confirm("受験記録・成績をすべて消します。元に戻せません。よいですか?")) { const c = S.custom; S = defaultState(); S.custom = c; save(); toast("消しました"); } };
+  $("#reset").onclick = () => { if (window.confirm("受験記録・成績・勉強の記録をすべて消します。元に戻せません。よいですか?")) { const c = S.custom; S = defaultState(); S.custom = c; save(); toast("消しました"); } };
 };
 
 // ---------- 出典・試験の構成 ----------
@@ -782,6 +947,7 @@ routes.about = () => page("出典・試験の構成", `
       <li>ホーム画面に追加: iPhoneはSafariの共有ボタン→「ホーム画面に追加」。Androidはメニュー→「ホーム画面に追加」。</li>
       <li>記録はこの端末だけに保存されます(ログイン不要)。「問題の追加・設定」で書き出し・読み戻しができます。</li>
       <li>レベルは1=やさしい、10=むずかしい。受けるたびにジャンル別のレベルが上下します。</li>
+      <li>勉強した時間と、解いた問題・見た情報(解説・地名のページ・動画など)の履歴も、この端末の中だけに記録します。成長グラフ(日別・週別の時間)と履歴のカレンダー(日ごとの一覧)に出ます。止める・消すは「問題の追加・設定」で。</li>
     </ul>
   </div>`);
 
