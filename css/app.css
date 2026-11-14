@@ -105,3 +105,25 @@ details summary{cursor:pointer;color:var(--link);padding:6px 0}
 .qfig{margin:8px 0 12px}
 .qfig img{width:100%;height:auto;border-radius:8px;background:#fff;display:block}
 .qfig figcaption{font-size:.8em;color:#aab2c5;margin-top:4px}
+/* 見て覚える(解説の下の地図・写真・図表) */
+.vis{margin-top:10px}
+.vhead{font-weight:700;color:#fff;margin:6px 0}
+.vcard{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;margin:8px 0}
+.vtitle{margin-bottom:6px}
+.vmap{position:relative;display:block;width:100%;padding:0;min-height:0;border-radius:10px;overflow:hidden;background:#1f2a3a;border:1px solid var(--line)}
+.vmap svg{display:block;width:100%;height:auto;aspect-ratio:16/10}
+.vmap .sea{fill:#1f2a3a}.vmap .land{fill:#4a5468;stroke:#2a3140;stroke-width:.6}.vmap .pref{fill:#4a5468;stroke:#6b7690;stroke-width:.5}
+.vmap .hl{fill:#2f6fd0;stroke:#9fc4ff;stroke-width:.8}.vmap .dot{fill:#ffd479;stroke:#1f2531;stroke-width:2}
+.vzoom{position:absolute;right:6px;bottom:6px;font-size:.75em;background:rgba(31,37,49,.85);border-radius:8px;padding:2px 8px;color:var(--fg)}
+.vpair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.vpair>:only-child{grid-column:1/-1}
+.vphoto img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:10px;display:block;background:var(--card2)}
+.vcap{font-size:.7em;color:var(--sub);margin-top:3px;word-break:break-word}
+.vlinks{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:.9em}
+.vfigbox{overflow-x:auto}
+.vtab{font-size:.8em;min-width:100%}
+.vtab td,.vtab th{padding:5px 4px;word-break:keep-all;overflow-wrap:anywhere}
+.vtab th{background:var(--card2);color:var(--fg)}
+.vfigbox p{font-size:.88em;margin:6px 0}
+.vfig{width:100%;max-width:420px;height:auto;display:block}
+.vmore summary{font-size:.9em}

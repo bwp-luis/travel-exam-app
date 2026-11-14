@@ -68,6 +68,86 @@ function srcHtml(q) {
   return `<div class="src">出典: ${h(q.source)}${links.length ? "<br>" + links.map(([t, u]) => `<a href="${h(u)}" target="_blank" rel="noopener">${t}</a>`).join(" ・ ") : ""}${isPast(q) ? `<br>レベルは推定(形式・計算の有無・文章量から自動で決めた目安)` : ""}</div>`;
 }
 
+// ---------- 見て覚える(解説の下に地図・写真・図表・動画の案内。data/visual/。tools/build_visuals.py で作る) ----------
+// 問題文と選択肢に出てくる地名・観光地・空港を辞書と照らし、自作の位置図(Natural Earth)・Wikimedia Commons の写真(作者・ライセンス付き)・
+// YouTube の検索リンクを出す。法令・約款・コードなどは自作の図表を出す。データは解説を開いたときに初めて読む
+let VIS = null, visLoading = null;
+const KANA = /[ァ-ヺー]/, reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function loadVis() {
+  return visLoading ||= Promise.all(["visuals", "geo"].map(f => fetch(`data/visual/${f}.json`).then(r => r.json()))).then(([v, g]) => {
+    const box = d => { const n = d.match(/-?[\d.]+/g), b = [1e9, 1e9, -1e9, -1e9]; // 形の外枠(見える範囲の形だけ描くため)
+      for (let i = 0; i < n.length; i += 2) { const x = +n[i], y = +n[i + 1]; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; }
+      return b; };
+    const shapes = o => Object.entries(o).filter(([, x]) => x.d).map(([k, x]) => ({ k, d: x.d, b: box(x.d) }));
+    // カタカナの地名は前後がカタカナでないときだけ当てる(パース⇔パースペクティブ など)
+    for (const p of v.places) p.re = new RegExp(p.a.map(k => (KANA.test(k[0]) ? "(?<![ァ-ヺー])" : "") + reEsc(k) + (KANA.test(k.at(-1)) ? "(?![ァ-ヺー])" : "")).join("|"), "g");
+    VIS = { places: v.places, figs: v.figs, world: shapes(g.world), jp: shapes(g.jp) };
+  }).catch(() => { visLoading = null; });
+}
+// 当てはまる地名(正解の選択肢 > ほかの選択肢 > 問題文の順)と図表
+function visMatch(q) {
+  const segs = [[q.question, 1], ...q.choices.map((c, i) => [c, q.ans.includes(i) ? 3 : 2])], hits = [];
+  segs.forEach(([t, w], si) => {
+    for (const p of VIS.places) {
+      let s = t; for (const ng of p.ng || []) s = s.split(ng).join("　".repeat(ng.length));
+      for (const m of s.matchAll(p.re)) hits.push({ p, si, w, s: m.index, e: m.index + m[0].length });
+    }
+  });
+  // 長い名前の一部として当たったもの(ケルン ⊂ ケルン大聖堂)は除く
+  const live = hits.filter(x => !hits.some(y => y !== x && y.si === x.si && y.s <= x.s && y.e >= x.e && y.e - y.s > x.e - x.s));
+  const best = new Map();
+  for (const x of live) { const o = best.get(x.p); if (!o || x.w > o.w || (x.w === o.w && x.si * 1e4 + x.s < o.si * 1e4 + o.s)) best.set(x.p, x); }
+  const places = [...best.values()].sort((a, b) => b.w - a.w || a.si - b.si || a.s - b.s).map(x => x.p);
+  const all = segs.map(x => x[0]).join("\n");
+  const figs = VIS.figs.filter(f => (f.keys || []).some(k => all.includes(k)) || (f.members || []).filter(k => new RegExp(`(?<![A-Za-z])${reEsc(k)}(?![A-Za-z])`).test(all)).length >= 2);
+  return { places, figs };
+}
+// 位置図: x=経度×10, y=−緯度×10(geo.json と同じ)。緯度に合わせて横を縮め、形がつぶれないようにする
+function mapSvg(p, wide) {
+  const jp = /^JP-/.test(p.r || ""), span = (jp ? 70 : 260) * (wide ? 3.2 : 1);
+  const W = span, H = W * Math.cos(p.lat * Math.PI / 180) * 0.625, cx = p.lon * 10, cy = -p.lat * 10, x0 = cx - W / 2, y0 = cy - H / 2;
+  const vis = s => s.b[2] >= x0 && s.b[0] <= x0 + W && s.b[3] >= y0 && s.b[1] <= y0 + H;
+  const path = (list, cls) => list.filter(vis).map(s => `<path d="${s.d}" class="${s.k === p.r ? "hl" : cls}" vector-effect="non-scaling-stroke"/>`).join("");
+  return `<svg viewBox="${x0} ${y0} ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${h(p.n)}の位置(${h(p.rn || "")})">
+    <rect x="${x0}" y="${y0}" width="${W}" height="${H}" class="sea"/>${path(VIS.world, "land")}${jp ? path(VIS.jp, "pref") : ""}
+    <ellipse cx="${cx}" cy="${cy}" rx="${W * .04}" ry="${H * .064}" class="dot" vector-effect="non-scaling-stroke"/></svg>`; // 点は地図の幅の約4%
+}
+const ytLink = s => `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(s)}" target="_blank" rel="noopener">▶ YouTubeで探す</a>`;
+function placeCard(p, i) {
+  // 地図と写真は横に並べる(スマホで1件が長くならないように)
+  return `<div class="vcard"><div class="vtitle">📍 <b>${h(p.n)}</b> <span class="sub">${h(p.rn || "")}・${h(p.k)}</span></div>
+    <div class="vpair">${p.lat != null ? `<button class="vmap" data-i="${VIS.places.indexOf(p)}" aria-label="地図の広さを切り替える">${mapSvg(p, false)}<span class="vzoom">広く</span></button>` : ""}
+    ${p.img ? `<a class="vphoto" href="${h(p.img.u)}" target="_blank" rel="noopener"><img src="${h(p.img.u)}" alt="${h(p.n)}の写真" loading="lazy"></a>` : ""}</div>
+    ${p.img ? `<div class="vcap">写真: ${h(p.img.by || "作者不明")} / ${h(p.img.lic)}(<a href="${h(p.img.page)}" target="_blank" rel="noopener">Wikimedia Commons</a>)</div>` : ""}
+    <div class="vlinks"><a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(p.w)}" target="_blank" rel="noopener">Wikipediaで読む</a>${ytLink(`${p.n} ${p.k === "空港" ? "空港" : p.k === "祭" ? "" : "観光"}`.trim())}</div></div>`;
+}
+function visBody(q) {
+  const { places, figs } = visMatch(q);
+  if (!places.length && !figs.length) return "";
+  const MAX = 4;
+  return `<div class="vhead">👀 見て覚える</div>
+    ${figs.map(f => `<div class="vcard"><div class="vtitle">📊 <b>${h(f.t)}</b></div><div class="vfigbox">${f.h}</div>
+      <div class="vlinks">${ytLink(f.yt)}</div><div class="src">${h(f.src)}</div></div>`).join("")}
+    ${places.slice(0, MAX).map(placeCard).join("")}
+    ${places.length > MAX ? `<details class="vmore"><summary>ほかの地名も見る(${places.slice(MAX).map(p => h(p.n)).join("・")})</summary>${places.slice(MAX).map(placeCard).join("")}</details>` : ""}
+    <div class="src">地図: Natural Earth(パブリックドメイン)をもとに自作 / 写真: Wikimedia Commons(作者・ライセンスは各写真の下) / 図表: 自作 / 動画: YouTube の検索結果(内容は各動画の作者のもの)</div>`;
+}
+const visHtml = q => `<div class="vis" data-q="${h(q.id)}"></div>`;
+// 見えている(閉じた details の中でない)「見て覚える」欄だけを埋める
+async function fillVis(root = document) {
+  const els = [...root.querySelectorAll(".vis:not([data-done])")].filter(el => !el.parentElement.closest("details:not([open])"));
+  if (!els.length) return;
+  if (!VIS) await loadVis();
+  if (!VIS) return;
+  for (const el of els) { const q = qById(el.dataset.q); el.dataset.done = "1"; if (q) el.innerHTML = visBody(q); if (!el.innerHTML) el.hidden = true; }
+}
+document.addEventListener("toggle", e => { if (e.target.open) fillVis(e.target); }, true);
+document.addEventListener("click", e => {
+  const b = e.target.closest(".vmap"); if (!b || !VIS) return;
+  const wide = b.classList.toggle("wide"), p = VIS.places[+b.dataset.i];
+  b.innerHTML = mapSvg(p, wide) + `<span class="vzoom">${wide ? "近く" : "広く"}</span>`;
+});
+
 // ---------- 問題の読み込み ----------
 async function loadBuiltin() {
   try {
@@ -216,7 +296,7 @@ function render() {
   window.scrollTo(0, 0);
   fn(parts.slice(1), params);
 }
-function page(title, html) { $("#title").textContent = title; $("#app").innerHTML = html; }
+function page(title, html) { $("#title").textContent = title; $("#app").innerHTML = html; fillVis(); }
 $("#back").onclick = () => { if (location.hash.startsWith("#/quiz") && session && !confirmLeave()) return; history.length > 1 ? history.back() : go("/"); };
 function confirmLeave() { return window.confirm("途中の解答は保存されません。やめますか?"); }
 
@@ -329,7 +409,7 @@ routes.quiz = () => {
       <div class="qtext">${h(q.question)}</div>${figHtml(q)}
       ${q.multi ? `<div class="multi-note">☑ 当てはまるものを<b>すべて</b>選ぶ問題(全部合って正解)</div>` : ""}
       <div class="choices" id="choices">${choiceHtml}</div>
-      ${showResult ? `<div class="expl"><b class="${ok ? "ok" : "bad"}">${ok ? "◯ 正解" : "✕ 不正解"}</b> 正解: ${h(ansText(q, q.ans))}${ok ? "" : `<br>あなたの答え: ${h(ansText(q, ch))}`}<br>${h(q.explanation)}</div>` : ""}
+      ${showResult ? `<div class="expl"><b class="${ok ? "ok" : "bad"}">${ok ? "◯ 正解" : "✕ 不正解"}</b> 正解: ${h(ansText(q, q.ans))}${ok ? "" : `<br>あなたの答え: ${h(ansText(q, ch))}`}<br>${h(q.explanation)}${visHtml(q)}</div>` : ""}
       ${srcHtml(q)}
     </div>
     ${s.mode === "exam" ? `<div class="sub">解答済み ${answered} / ${s.items.length}。前後に移動して見直せます。</div>` : ""}
@@ -424,7 +504,7 @@ function answerList(answers) {
     return `<div class="card"><div class="qhead"><b class="${x.ok ? "ok" : "bad"}">${x.ok ? "◯" : "✕"} 問${i + 1}</b>${chip(q.genre)}<span class="chip">Lv ${q.level}</span>${q.multi ? `<span class="chip">すべて選ぶ</span>` : ""}</div>
       <div class="pre">${h(q.question)}</div>${figHtml(q)}
       <div class="sub" style="margin-top:4px">あなたの答え: <span class="${x.ok ? "ok" : "bad"}">${h(ansText(q, toArr(x.chosen)))}</span><br>正解: <span class="ok">${h(ansText(q, q.ans))}</span></div>
-      <details><summary>選択肢と解説</summary>${choiceList(q)}${h(q.explanation)}${srcHtml(q)}</details></div>`;
+      <details><summary>選択肢と解説</summary>${choiceList(q)}${h(q.explanation)}${visHtml(q)}${srcHtml(q)}</details></div>`;
   }).join("");
 }
 function choiceList(q) {
@@ -460,7 +540,7 @@ routes.study = (_, p) => {
         ${s.seen ? `<span class="sub">${s.seen}回中 ${s.wrong}回ミス</span>` : `<span class="sub">未出題</span>`}</div>
         <div class="pre">${h(q.question)}</div>${figHtml(q)}
         <details><summary>選択肢・正解・解説を見る</summary>${choiceList(q)}
-        <div class="expl">${h(q.explanation)}</div>${srcHtml(q)}</details></div>`; }).join("")}
+        <div class="expl">${h(q.explanation)}</div>${visHtml(q)}${srcHtml(q)}</details></div>`; }).join("")}
       ${total > limit ? `<button id="more" class="btn-block">もっと見る(残り ${total - limit} 問)</button>` : ""}`);
     const upd = () => { g = $("#g").value; lv = $("#lv").value; only = $("#only").value; kw = $("#kw").value.trim(); og = $("#o").value; yr = $("#y").value; limit = 30;
       history.replaceState(null, "", `#/study?g=${g}&lv=${lv}&only=${only}&o=${og}&y=${encodeURIComponent(yr)}&kw=${encodeURIComponent(kw)}`); draw(); };
@@ -533,7 +613,7 @@ routes.analysis = () => {
       ${s.last === false ? `<span class="bad">前回も✕</span>` : `<span class="ok">前回は◯</span>`}<span class="sub">${s.seen}回中${s.wrong}回ミス</span></div>
       <div class="pre">${h(q.question)}</div>${figHtml(q)}
       <div class="sub" style="margin-top:4px">${s.last === false ? `前回の答え: <span class="bad">${h(ansText(q, toArr(s.lastChosen)))}</span><br>` : ""}正解: <span class="ok">${h(ansText(q, q.ans))}</span></div>
-      <details><summary>選択肢と解説</summary>${choiceList(q)}${h(q.explanation)}${srcHtml(q)}</details></div>`; }).join("") || `<div class="card sub">まだ間違えた問題はありません。</div>`}`);
+      <details><summary>選択肢と解説</summary>${choiceList(q)}${h(q.explanation)}${visHtml(q)}${srcHtml(q)}</details></div>`; }).join("") || `<div class="card sub">まだ間違えた問題はありません。</div>`}`);
 };
 
 // ---------- 成長グラフ ----------
@@ -685,6 +765,13 @@ routes.about = () => page("出典・試験の構成", `
       <li><a href="https://www.mlit.go.jp/kankocho/shiken_kanrisha.html" target="_blank" rel="noopener">観光庁: 旅行業務取扱管理者試験</a></li>
       <li><a href="https://www.jata-net.or.jp/" target="_blank" rel="noopener">日本旅行業協会(JATA)</a></li>
       <li><a href="https://www.anta.or.jp/" target="_blank" rel="noopener">全国旅行業協会(ANTA)</a></li>
+    </ul>
+    <p><b>見て覚える(解説の下の地図・写真・図表・動画)</b></p>
+    <ul class="sub">
+      <li>地図: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>(パブリックドメイン)の国・都道府県の形をもとに、このサイトで作った位置図。点の位置は Wikipedia / Wikidata の座標。</li>
+      <li>写真: Wikimedia Commons の自由ライセンス(CC BY・CC BY-SA・パブリックドメインなど)の写真を、Wikimedia のサーバーから表示。作者とライセンスを各写真の下に表示しています。</li>
+      <li>図表(旅行業の種別・取消料・旅程保証・特別補償・時差・コード表・日本三名園など): このサイトで作ったもの。法令・約款は作成時点の要点なので、改正に注意してください。</li>
+      <li>動画: YouTube の検索結果へのリンク(特定の動画は埋め込んでいません)。</li>
     </ul>
     <p class="sub">収録しているサンプル問題は、過去問の本文を複製したものではなく、出題分野を参考に作ったオリジナル問題です。法令・約款・運賃制度・入国制度は改正されることがあるため、最新の法令・公式資料で確かめてください。各問題の下に出典を表示しています。過去問を取り込むときは、各協会の利用条件を確認し、出典(年度・科目・問番号)を source 欄に書いてください。</p>
   </div>

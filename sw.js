@@ -1,5 +1,5 @@
 // オフラインでも開けるようにする。画面の部品と問題データを保存しておき、通信できないときに使う。
-const CACHE = "tex-v3";
+const CACHE = "tex-v4";
 const SHELL = ["./", "index.html", "css/app.css", "js/app.js", "manifest.webmanifest", "icons/icon.svg",
   "icons/icon-192.png", "icons/icon-512.png", "data/sets.json", "data/questions.json"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
