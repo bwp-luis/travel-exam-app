@@ -1,0 +1,2 @@
+id,genre,level,topic,question,choice1,choice2,choice3,choice4,answer,explanation,source
+R07-H-01,法令,3,旅行業法,ここに問題文を書く(カンマや改行を含むときは全体をダブルクォートで囲む),選択肢1,選択肢2,選択肢3,選択肢4,2,ここに解説を書く。answerは正解の番号(1〜4)。genreは 国内/海外/法令。levelは1(やさしい)〜10(むずかしい)。,令和7年度 総合旅行業務取扱管理者試験 旅行業法 問1(JATA)

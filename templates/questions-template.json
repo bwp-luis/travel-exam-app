@@ -1,0 +1,15 @@
+{
+  "questions": [
+    {
+      "id": "R07-K-01",
+      "genre": "domestic",
+      "level": 4,
+      "topic": "JR運賃・料金",
+      "question": "ここに問題文を書く",
+      "choices": ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
+      "answer": 1,
+      "explanation": "ここに解説を書く。answer は 0 から数える(0=選択肢1)。genre は domestic(国内)/overseas(海外)/law(法令) か 国内/海外/法令。",
+      "source": "令和7年度 国内旅行業務取扱管理者試験 国内旅行実務 問1(ANTA)"
+    }
+  ]
+}

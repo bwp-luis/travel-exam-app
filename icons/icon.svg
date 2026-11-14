@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" fill="#2a3140"/>
+<circle cx="256" cy="230" r="150" fill="none" stroke="#7db4ff" stroke-width="22"/>
+<path d="M106 230h300M256 80c-60 50-60 250 0 300M256 80c60 50 60 250 0 300" fill="none" stroke="#7db4ff" stroke-width="14"/>
+<path d="M330 330l40 40 80-90" fill="none" stroke="#5fd18a" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="256" y="470" font-family="Hiragino Sans,sans-serif" font-size="68" font-weight="800" fill="#e8ebf2" text-anchor="middle">旅管</text>
+</svg>

@@ -1,0 +1,6 @@
+{
+ "files": ["questions.json"],
+ "optional": ["kakomon/kanko-chiiki.json"],
+ "locked": ["locked/jata-sogo.enc", "locked/anta-kokunai.enc"],
+ "note": "公開版。JATA・ANTA の過去問は合言葉で暗号化した locked/ のファイルだけを置く(画面で合言葉を入れると端末の中で開く)。"
+}

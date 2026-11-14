@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2a3140">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="旅管試験">
+<meta name="secretary-case" content="C93">
+<meta name="secretary-task" content="3f5bd5">
+<title>旅行業務取扱管理者 学習・模擬試験</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<!-- アプリの画面なので、案件番号の大きな表示は出さない(sec-caseno があると表示しない決まり) -->
+<div class="sec-caseno" hidden></div>
+<header class="top"><button class="back" id="back" hidden>‹ 戻る</button><h1 id="title">旅管 学習・模擬試験</h1></header>
+<main id="app"><p class="sub">読み込み中…</p></main>
+<nav class="tabs" id="tabs">
+  <a href="#/" data-r="home"><b>⌂</b>ホーム</a>
+  <a href="#/study" data-r="study"><b>📖</b>勉強</a>
+  <a href="#/history" data-r="history"><b>📅</b>履歴</a>
+  <a href="#/analysis" data-r="analysis"><b>🎯</b>弱点</a>
+  <a href="#/charts" data-r="charts"><b>📈</b>グラフ</a>
+</nav>
+<script src="js/app.js"></script>
+<!--caseno-start--><script>
+(function(){
+/* 資料の案件番号(正本)。案件番号を入れる.py で各HTMLに埋め込む(目印 caseno-start/end)。秘書のサーバーも、開くときに自動で入れる。
+   <meta name="secretary-case" content="B21"> の番号を、タイトル(最初の h1)のすぐ上に大きく出す。タブの題名の頭にも付ける。
+   番号は 英字1つ+数字(A1〜Y99)。テンプレートの A0 など番号でないものは出さない。
+   自分で書いた <div class="sec-caseno"> があれば、そちらを使って何もしない。 */
+if(window.__caseno)return;window.__caseno=1;
+function run(){
+ var m=document.querySelector('meta[name="secretary-case"]'),c=m?(m.getAttribute('content')||'').trim().toUpperCase():'';
+ if(!/^[A-Z][1-9][0-9]?$/.test(c)||document.querySelector('.sec-caseno'))return;
+ var st=document.createElement('style');
+ st.textContent='.sec-caseno{display:inline-flex;align-items:baseline;gap:8px;margin:4px 0 8px;padding:4px 16px 6px;border-radius:12px;'+
+  'background:#ffb454;color:#1b2030;font-weight:800;line-height:1.1;box-shadow:0 2px 8px rgba(0,0,0,.35)}'+
+  '.sec-caseno .sec-caseno-l{font-size:15px;font-weight:700}.sec-caseno .sec-caseno-c{font-size:34px;letter-spacing:.04em}';
+ (document.head||document.body).appendChild(st);
+ var b=document.createElement('div');b.className='sec-caseno';b.title='この資料の案件番号';
+ var l=document.createElement('span');l.className='sec-caseno-l';l.textContent='案件';
+ var n=document.createElement('span');n.className='sec-caseno-c';n.textContent=c;
+ b.appendChild(l);b.appendChild(n);
+ var h=document.querySelector('h1');
+ if(h&&h.parentNode)h.parentNode.insertBefore(b,h);
+ else{var f=document.body.firstElementChild;while(f&&/^(SCRIPT|STYLE)$/.test(f.tagName))f=f.nextElementSibling;
+  (f&&f.firstChild?f:document.body).insertBefore(b,(f&&f.firstChild)||document.body.firstChild)}
+ if(document.title&&document.title.indexOf(c)!==0)document.title=c+' '+document.title;
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);else run();
+})();
+</script><!--caseno-end-->
+</body>
+</html>

@@ -1,0 +1,107 @@
+/* 共通ダーク配色(AI WORK/_成果物/_共通スタイル/ダーク配色.css と同じ色)+スマホ向けの部品 */
+:root{
+  color-scheme:dark;
+  --bg:#2a3140; --card:#353d4e; --card2:#3d4659; --line:#4a5468;
+  --fg:#e8ebf2; --sub:#a9b2c3; --link:#7db4ff;
+  --ok:#5fd18a; --todo:#ffb454; --bad:#ff8a80; --accent:#7db4ff;
+  /* ジャンルの色(dataviz の検証済みダーク用3色。色だけに頼らず文字・形も付ける) */
+  --g-domestic:#3987e5; --g-overseas:#d95926; --g-law:#199e70;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+a{color:var(--link)}
+header.top{position:sticky;top:0;z-index:5;background:rgba(42,49,64,.96);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line);padding:calc(8px + env(safe-area-inset-top)) 14px 8px;display:flex;align-items:center;gap:10px}
+header.top h1{font-size:1.02em;margin:0;flex:1;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.top .back{background:none;border:0;color:var(--link);font-size:1em;padding:6px 4px;min-width:44px;text-align:left}
+main{max-width:720px;margin:auto;padding:12px 14px}
+h2{font-size:1.08em;margin:18px 0 8px;color:#f4f6fb;border-bottom:1px solid var(--line);padding-bottom:4px}
+h3{font-size:1em;margin:12px 0 6px;color:#f4f6fb}
+.sub{color:var(--sub);font-size:.88em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{display:flex;flex-direction:column;justify-content:center;min-height:88px;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:12px;color:var(--fg);text-decoration:none;font-weight:700}
+.tile .ic{font-size:1.5em;line-height:1}
+.tile .sub{font-weight:400;margin-top:2px}
+.tile.main{grid-column:1/-1;background:linear-gradient(135deg,#2f5ea8,#3d4659);border-color:#4f78c0}
+button,.btn{font:inherit;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--fg);
+  padding:12px 14px;min-height:48px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:disabled{opacity:.45}
+.btn-primary{background:#2f6fd0;border-color:#4b8ae8;color:#fff;font-weight:700}
+.btn-block{display:flex;width:100%;margin:8px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1}
+.seg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.seg button[aria-pressed="true"]{background:#2f6fd0;border-color:#7db4ff;color:#fff;font-weight:700}
+.seg.n4{grid-template-columns:repeat(4,1fr)}
+input[type=range]{width:100%;height:36px;accent-color:#7db4ff}
+input[type=text],input[type=date],input[type=search],select,textarea{font:inherit;width:100%;background:var(--bg);color:var(--fg);
+  border:1px solid var(--line);border-radius:10px;padding:10px}
+.lvl-big{font-size:2em;font-weight:800;color:#fff;text-align:center;line-height:1.1}
+.lvl-scale{display:flex;justify-content:space-between;color:var(--sub);font-size:.85em}
+.chip{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.8em;border:1px solid var(--line);background:var(--card2);color:var(--fg);white-space:nowrap}
+.chip.domestic{border-color:var(--g-domestic)} .chip.overseas{border-color:var(--g-overseas)} .chip.law{border-color:var(--g-law)}
+.chip.domestic::before,.chip.overseas::before,.chip.law::before{content:"";display:inline-block;width:8px;height:8px;margin-right:5px;vertical-align:1px}
+.chip.domestic::before{background:var(--g-domestic);border-radius:50%}
+.chip.overseas::before{background:var(--g-overseas)}
+.chip.law::before{background:var(--g-law);clip-path:polygon(50% 0,100% 100%,0 100%)}
+/* 問題 */
+.qhead{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.qtext{font-size:1.06em;font-weight:600;color:#fff;margin:6px 0 12px}
+.choices{display:flex;flex-direction:column;gap:10px}
+.choice{justify-content:flex-start;text-align:left;width:100%;padding:14px;line-height:1.5}
+.choice .no{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:6px}
+.choice.sel{border-color:#7db4ff;background:#2b4f86}
+.choice.right{border-color:var(--ok);background:#24523a}
+.choice.wrong{border-color:var(--bad);background:#5a2d2d}
+.expl{border-left:4px solid var(--accent);background:var(--card2);border-radius:10px;padding:10px 12px;margin-top:12px}
+.progress{height:6px;background:var(--card2);border-radius:3px;overflow:hidden;margin:4px 0 10px}
+.progress>i{display:block;height:100%;background:var(--accent)}
+.ok{color:var(--ok);font-weight:700}.bad{color:var(--bad);font-weight:700}.todo{color:var(--todo);font-weight:700}
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(42,49,64,.97);border-top:1px solid var(--line);
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;max-width:720px;margin:auto}
+.dock>*{flex:1}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(42,49,64,.97);border-top:1px solid var(--line);
+  display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs a{flex:1;text-align:center;color:var(--sub);text-decoration:none;font-size:.72em;padding:7px 0 6px}
+nav.tabs a b{display:block;font-size:1.5em;line-height:1.2;font-weight:400}
+nav.tabs a.on{color:#fff}
+table{width:100%;border-collapse:collapse;font-size:.9em}
+td,th{border-bottom:1px solid var(--line);padding:7px 5px;text-align:left;vertical-align:top}
+th{color:var(--sub);font-weight:600}
+.score-big{font-size:2.6em;font-weight:800;text-align:center;color:#fff;line-height:1.1}
+.bar{height:10px;background:var(--card2);border-radius:5px;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:5px}
+/* カレンダー */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .dow{color:var(--sub);font-size:.78em}
+.cal .d{min-height:46px;border-radius:8px;background:var(--card2);padding:3px 0;font-size:.85em;border:1px solid transparent}
+.cal .d.empty{background:none}
+.cal .d.has{border-color:var(--accent);cursor:pointer}
+.cal .d.today{outline:2px solid var(--todo)}
+.cal .d .s{display:block;font-size:.78em;font-weight:700;color:#fff}
+.cal .d.sel{background:#2b4f86}
+/* グラフ */
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .tip{position:absolute;pointer-events:none;background:#1f2531;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:.8em;white-space:nowrap;display:none;z-index:3}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.85em;color:var(--fg);margin:4px 0}
+details summary{cursor:pointer;color:var(--link);padding:6px 0}
+.src{font-size:.78em;color:var(--sub);margin-top:8px}
+.toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#1f2531;border:1px solid var(--line);padding:10px 16px;border-radius:10px;z-index:9}
+.list-q{padding:10px 0;border-bottom:1px solid var(--line)}
+.list-q:last-child{border-bottom:0}
+/* 過去問(長い本文・すべて選ぶ問題) */
+.qtext,.pre{white-space:pre-wrap;word-break:break-word}
+.multi-note{background:#3b3420;border:1px solid #ffb454;color:#ffd9a0;border-radius:10px;padding:6px 10px;margin:0 0 10px;font-size:.9em}
+.choice .no.sq{border-radius:6px}
+.clist{list-style:none;padding:0;margin:8px 0}
+.clist li{padding:4px 0;border-bottom:1px dashed var(--line)}
+/* 問題用紙から切り出した図・写真(白地の画像なので枠を付けて読みやすく) */
+.qfig{margin:8px 0 12px}
+.qfig img{width:100%;height:auto;border-radius:8px;background:#fff;display:block}
+.qfig figcaption{font-size:.8em;color:#aab2c5;margin-top:4px}
