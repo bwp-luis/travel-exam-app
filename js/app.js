@@ -120,7 +120,7 @@ function placeCard(p, i) {
     ${p.img ? `<a class="vphoto" href="${h(p.img.u)}" target="_blank" rel="noopener"><img src="${h(p.img.u)}" alt="${h(p.n)}の写真" loading="lazy"></a>` : ""}</div>
     ${p.img ? `<div class="vcap">写真: ${h(p.img.by || "作者不明")} / ${h(p.img.lic)}(<a href="${h(p.img.page)}" target="_blank" rel="noopener">Wikimedia Commons</a>)</div>` : ""}
     <div class="vlinks"><a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(p.w)}" target="_blank" rel="noopener">Wikipediaで読む</a>${p.yt ? "" : ytLink(`${p.n} ${p.k === "空港" ? "空港" : p.k === "祭" ? "" : "観光"}`.trim())}</div>
-    ${p.yt ? `<a class="vyt" href="https://www.youtube.com/watch?v=${h(p.yt.id)}" target="_blank" rel="noopener"><span class="vplay">▶</span><span><b>おすすめ動画</b> ${h(p.yt.t)}<br><span class="sub">${h(p.yt.ch)}</span></span></a>` : ""}</div>`;
+    ${p.yt ? `<a class="vyt" href="https://www.youtube.com/watch?v=${h(p.yt.id)}" target="_blank" rel="noopener"><span class="vplay">▶</span><span><b>${p.yt.own ? "参考動画(個人の旅行チャンネル)" : "おすすめ動画"}</b> ${h(p.yt.t)}<br><span class="sub">${h(p.yt.ch)}</span></span></a>` : ""}</div>`;
 }
 function visBody(q) {
   const { places, figs } = visMatch(q);
@@ -131,7 +131,7 @@ function visBody(q) {
       <div class="vlinks">${ytLink(f.yt)}</div><div class="src">${h(f.src)}</div></div>`).join("")}
     ${places.slice(0, MAX).map(placeCard).join("")}
     ${places.length > MAX ? `<details class="vmore"><summary>ほかの地名も見る(${places.slice(MAX).map(p => h(p.n)).join("・")})</summary>${places.slice(MAX).map(placeCard).join("")}</details>` : ""}
-    <div class="src">地図: Natural Earth(パブリックドメイン)をもとに自作 / 写真: Wikimedia Commons(作者・ライセンスは各写真の下) / 図表: 自作 / 動画: 自治体・観光局・世界遺産検定などの公式動画(内容は各チャンネルのもの)か YouTube の検索結果</div>`;
+    <div class="src">地図: Natural Earth(パブリックドメイン)をもとに自作 / 写真: Wikimedia Commons(作者・ライセンスは各写真の下) / 図表: 自作 / 動画: 自治体・観光局・世界遺産検定などの公式動画、無いものは旅行会社・個人の旅行チャンネルの動画(内容は各チャンネルのもの)</div>`;
 }
 const visHtml = q => `<div class="vis" data-q="${h(q.id)}"></div>`;
 // 見えている(閉じた details の中でない)「見て覚える」欄だけを埋める
@@ -772,7 +772,7 @@ routes.about = () => page("出典・試験の構成", `
       <li>地図: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>(パブリックドメイン)の国・都道府県の形をもとに、このサイトで作った位置図。点の位置は Wikipedia / Wikidata の座標。</li>
       <li>写真: Wikimedia Commons の自由ライセンス(CC BY・CC BY-SA・パブリックドメインなど)の写真を、Wikimedia のサーバーから表示。作者とライセンスを各写真の下に表示しています。</li>
       <li>図表(旅行業の種別・取消料・旅程保証・特別補償・時差・コード表・日本三名園など): このサイトで作ったもの。法令・約款は作成時点の要点なので、改正に注意してください。</li>
-      <li>動画: よく出る地名には、自治体・観光協会・政府観光局・世界遺産検定(公式)などの動画へのリンクを「おすすめ動画」として付けています(題名・チャンネルを確かめて選んだもの。埋め込みはしていません)。それ以外は YouTube の検索結果へのリンク。</li>
+      <li>動画: よく出る地名には、自治体・観光協会・政府観光局・世界遺産検定(公式)などの動画へのリンクを「おすすめ動画」として付けています(題名・チャンネルを確かめて選んだもの。埋め込みはしていません)。公式の動画が見つからない地名には、旅行会社や個人の旅行チャンネルの動画を「参考動画」として付けています(内容の正確さは公式ほど確かではありません)。それ以外は YouTube の検索結果へのリンク。</li>
     </ul>
     <p class="sub">収録しているサンプル問題は、過去問の本文を複製したものではなく、出題分野を参考に作ったオリジナル問題です。法令・約款・運賃制度・入国制度は改正されることがあるため、最新の法令・公式資料で確かめてください。各問題の下に出典を表示しています。過去問を取り込むときは、各協会の利用条件を確認し、出典(年度・科目・問番号)を source 欄に書いてください。</p>
   </div>
