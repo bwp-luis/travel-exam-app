@@ -126,7 +126,7 @@ function placeCard(p, i) {
     ${p.img ? `<a class="vphoto" href="${h(p.img.u)}" target="_blank" rel="noopener" data-log="photo" data-n="${h(p.n)}"><img src="${h(p.img.u)}" alt="${h(p.n)}の写真" loading="lazy"></a>` : ""}</div>
     ${p.img ? `<div class="vcap">写真: ${h(p.img.by || "作者不明")} / ${h(p.img.lic)}(<a href="${h(p.img.page)}" target="_blank" rel="noopener">Wikimedia Commons</a>)</div>` : ""}
     <div class="vlinks"><a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(p.w)}" target="_blank" rel="noopener" data-log="wiki" data-n="${h(p.n)}">Wikipediaで読む</a>${p.yt ? "" : ytLink(`${p.n} ${p.k === "空港" ? "空港" : p.k === "祭" ? "" : "観光"}`.trim())}</div>
-    ${p.yt ? `<a class="vyt" href="https://www.youtube.com/watch?v=${h(p.yt.id)}" target="_blank" rel="noopener" data-log="video" data-n="${h(p.n + "|" + p.yt.t)}"><span class="vplay">▶</span><span><b>${p.yt.own ? "参考動画(個人の旅行チャンネル)" : "おすすめ動画"}</b> ${h(p.yt.t)}<br><span class="sub">${h(p.yt.ch)}</span></span></a>` : ""}</div>`;
+    ${p.yt ? `<a class="vyt" href="https://www.youtube.com/watch?v=${h(p.yt.id)}" data-yt="${h(p.yt.id)}" data-t="${h(p.yt.t)}" target="_blank" rel="noopener" data-log="video" data-n="${h(p.n + "|" + p.yt.t)}"><span class="vplay">▶</span><span><b>${p.yt.own ? "参考動画(個人の旅行チャンネル)" : "おすすめ動画"}</b> ${h(p.yt.t)}<br><span class="sub">${h(p.yt.ch)}</span></span></a>` : ""}</div>`;
 }
 function visBody({ places, figs }) {
   if (!places.length && !figs.length) return "";
@@ -160,6 +160,48 @@ document.addEventListener("click", e => {
   b.innerHTML = mapSvg(p, wide) + `<span class="vzoom">${wide ? "近く" : "広く"}</span>`;
 });
 
+// ---------- 動画をアプリの中で見る(おすすめ動画を押すと、画面の上に YouTube の埋め込みを出す。閉じると元の画面) ----------
+// youtube-nocookie.com の埋め込みを使う。埋め込みが許されていない動画は YouTube から知らせ(onError)が来るので、別タブで開く案内に切り替える
+const YT_ORIGIN = "https://www.youtube-nocookie.com";
+let vmodal = null, vplaying = false;
+function openVideo(id, title, href) {
+  closeVideo(true);
+  vmodal = document.createElement("div");
+  vmodal.className = "vmodal"; vmodal.setAttribute("role", "dialog"); vmodal.setAttribute("aria-modal", "true"); vmodal.setAttribute("aria-label", "動画: " + title);
+  const src = `${YT_ORIGIN}/embed/${encodeURIComponent(id)}?autoplay=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+  vmodal.innerHTML = `<div class="vmbox">
+    <div class="vmhead"><b>${h(title)}</b><button class="vmclose" type="button" aria-label="閉じる">✕ 閉じる</button></div>
+    <div class="vmplayer"><iframe src="${h(src)}" title="${h(title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <div class="vmerr" hidden><p>この動画は、アプリの中では再生できません(動画の持ち主が埋め込みを許していません)。</p>
+      <a class="btn" href="${h(href)}" target="_blank" rel="noopener">▶ YouTubeで開く(別のタブ)</a></div></div>
+    <div class="vmfoot sub">うまく再生されないときは <a href="${h(href)}" target="_blank" rel="noopener">YouTubeで開く</a></div></div>`;
+  document.body.appendChild(vmodal); document.body.classList.add("noscroll");
+  const fr = vmodal.querySelector("iframe");
+  fr.addEventListener("load", () => fr.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: "vm", channel: "widget" }), YT_ORIGIN));
+  vmodal.addEventListener("click", e => { if (e.target === vmodal || e.target.closest(".vmclose")) closeVideo(); });
+  vmodal.querySelector(".vmclose").focus();
+  history.pushState({ vmodal: 1 }, ""); // スマホの「戻る」でも閉じる
+}
+function closeVideo(quiet) {
+  if (!vmodal) return;
+  vmodal.remove(); vmodal = null; vplaying = false; document.body.classList.remove("noscroll");
+  if (!quiet && history.state?.vmodal) history.back();
+}
+addEventListener("popstate", () => { if (vmodal) closeVideo(true); });
+addEventListener("keydown", e => { if (e.key === "Escape" && vmodal) closeVideo(); });
+addEventListener("message", e => {
+  if (!vmodal || e.origin !== YT_ORIGIN || typeof e.data !== "string") return;
+  let m; try { m = JSON.parse(e.data); } catch (x) { return; }
+  if (m.event === "onError") { vmodal.querySelector("iframe").hidden = true; vmodal.querySelector(".vmerr").hidden = false; }
+  const st = m.event === "onStateChange" ? m.info : m.info?.playerState;
+  if (typeof st === "number") vplaying = st === 1; // 再生中は触っていなくても勉強時間に数える
+});
+document.addEventListener("click", e => {
+  const a = e.target.closest("a.vyt[data-yt]");
+  if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return; // 修飾キー付きは従来どおり別タブ
+  e.preventDefault(); openVideo(a.dataset.yt, a.dataset.t || "動画", a.href);
+});
+
 // ---------- 勉強した時間と、解いた問題・見た情報の履歴(S.activity。この端末の localStorage だけに保存) ----------
 // 時間: 画面を開いていて、2分以内に触っている間だけ15秒ずつ足す(解いている間=quiz、それ以外=read)
 const TICK = 15, IDLE = 120e3, LOG_MAX = 8000, LOG_DAYS = 400;
@@ -167,7 +209,7 @@ let lastInput = Date.now(), unsavedTicks = 0;
 ["pointerdown", "keydown", "scroll", "touchstart", "wheel"].forEach(ev => addEventListener(ev, () => { lastInput = Date.now(); }, { passive: true, capture: true }));
 const studying = () => !!session && location.hash.startsWith("#/quiz");
 setInterval(() => {
-  if (!S.activity.on || document.visibilityState !== "visible" || Date.now() - lastInput > IDLE) return;
+  if (!S.activity.on || document.visibilityState !== "visible" || (Date.now() - lastInput > IDLE && !(vmodal && vplaying))) return;
   const d = (S.activity.days[dayKey(new Date())] ||= { quiz: 0, read: 0 });
   d[studying() ? "quiz" : "read"] += TICK;
   if (++unsavedTicks >= 4) flushAct(); // 保存は1分ごと(と画面を離れたとき)
@@ -937,7 +979,7 @@ routes.about = () => page("出典・試験の構成", `
       <li>地図: <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>(パブリックドメイン)の国・都道府県の形をもとに、このサイトで作った位置図。点の位置は Wikipedia / Wikidata の座標。</li>
       <li>写真: Wikimedia Commons の自由ライセンス(CC BY・CC BY-SA・パブリックドメインなど)の写真を、Wikimedia のサーバーから表示。作者とライセンスを各写真の下に表示しています。</li>
       <li>図表(旅行業の種別・取消料・旅程保証・特別補償・時差・コード表・日本三名園など): このサイトで作ったもの。法令・約款は作成時点の要点なので、改正に注意してください。</li>
-      <li>動画: よく出る地名には、自治体・観光協会・政府観光局・世界遺産検定(公式)などの動画へのリンクを「おすすめ動画」として付けています(題名・チャンネルを確かめて選んだもの。埋め込みはしていません)。公式の動画が見つからない地名には、旅行会社や個人の旅行チャンネルの動画を「参考動画」として付けています(内容の正確さは公式ほど確かではありません)。それ以外は YouTube の検索結果へのリンク。</li>
+      <li>動画: よく出る地名には、自治体・観光協会・政府観光局・世界遺産検定(公式)などの動画を「おすすめ動画」として付けています(題名・チャンネルを確かめて選んだもの。押すとアプリの中で再生し、埋め込みが許されていない動画は YouTube を別のタブで開く案内を出します)。公式の動画が見つからない地名には、旅行会社や個人の旅行チャンネルの動画を「参考動画」として付けています(内容の正確さは公式ほど確かではありません)。それ以外は YouTube の検索結果へのリンク。</li>
     </ul>
     <p class="sub">収録しているサンプル問題は、過去問の本文を複製したものではなく、出題分野を参考に作ったオリジナル問題です。法令・約款・運賃制度・入国制度は改正されることがあるため、最新の法令・公式資料で確かめてください。各問題の下に出典を表示しています。過去問を取り込むときは、各協会の利用条件を確認し、出典(年度・科目・問番号)を source 欄に書いてください。</p>
   </div>

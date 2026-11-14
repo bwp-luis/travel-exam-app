@@ -141,3 +141,16 @@ details summary{cursor:pointer;color:var(--link);padding:6px 0}
 .loglist .tm{flex:0 0 40px;color:var(--sub);font-size:.82em;font-variant-numeric:tabular-nums}
 .loglist .li>span:last-child{flex:1;min-width:0;overflow-wrap:anywhere}
 .stats .sub{white-space:nowrap}
+/* 動画をアプリの中で見る(画面の上に重ねる。スマホは横幅いっぱい、16:9) */
+body.noscroll{overflow:hidden}
+.vmodal{position:fixed;inset:0;z-index:20;background:rgba(15,18,25,.88);display:flex;align-items:center;justify-content:center;
+  padding:max(10px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.vmbox{width:100%;max-width:880px;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.vmhead{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 8px 8px 12px}
+.vmhead b{font-size:.92em;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.vmclose{flex:none;min-height:44px;padding:0 14px;font-weight:700}
+.vmplayer{position:relative;aspect-ratio:16/9;background:#000}
+.vmplayer iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.vmerr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;background:var(--card2)}
+.vmerr p{margin:0;font-size:.9em}
+.vmfoot{padding:8px 12px;font-size:.82em}
